@@ -1,0 +1,169 @@
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+#include <Servo.h>
+#define echoPin 13 // attach pin D2 Arduino to pin Echo of HC-SR04
+#define trigPin 12 //attach pin D3 Arduino to pin Trig of HC-SR04
+//===============================
+long duration; // variable for the duration of sound wave travel
+int distance; // variable for the distance measurement
+int IR1 = 5;
+int IR2 = 4;
+int Green_led = 6;
+int Red_led = 7;
+int total = 6;
+Servo servo_1;
+Servo servo_2;
+//////////////////////////////////////////////
+//        RemoteXY include library          //
+//////////////////////////////////////////////
+
+// RemoteXY select connection mode and include library 
+#define REMOTEXY_MODE__ESP8266_HARDSERIAL_POINT
+
+#include <RemoteXY.h>
+
+// RemoteXY connection settings 
+#define REMOTEXY_SERIAL Serial
+#define REMOTEXY_SERIAL_SPEED 115200
+#define REMOTEXY_WIFI_SSID "Smart Parking"
+#define REMOTEXY_WIFI_PASSWORD "12345678"
+#define REMOTEXY_SERVER_PORT 6377
+
+
+// RemoteXY configurate  
+#pragma pack(push, 1)
+uint8_t RemoteXY_CONF[] =   // 38 bytes
+  { 255,0,0,11,0,31,0,16,8,1,129,0,2,22,18,6,16,84,104,101,
+  32,83,108,111,116,115,32,58,0,67,4,35,20,25,11,16,26,11 };
+  
+// this structure defines all the variables and events of your control interface 
+struct {
+
+    // output variables
+  char totalx[11];  // string UTF8 end zero 
+
+    // other variable
+  uint8_t connect_flag;  // =1 if wire connected, else =0 
+
+} RemoteXY;
+#pragma pack(pop)
+
+/////////////////////////////////////////////
+//           END RemoteXY include          //
+/////////////////////////////////////////////
+
+
+
+void setup() 
+{
+  RemoteXY_Init (); 
+  
+  pinMode(trigPin, OUTPUT); // Sets the trigPin as an OUTPUT
+  pinMode(echoPin, INPUT); // Sets the echoPin as an INPUT
+  Serial.begin(9600); // // Serial Communication is starting with 9600 of baudrate speed
+  Serial.println("Ultrasonic Sensor HC-SR04 Test"); // print some text in Serial Monitor
+  Serial.println("with Arduino UNO R3");
+  lcd.init();
+  lcd.backlight();
+  
+  pinMode(Green_led, OUTPUT);
+  pinMode(Red_led, OUTPUT);
+  
+  pinMode(IR1, INPUT);
+  pinMode(IR2, INPUT);
+  
+  servo_1.attach(10);
+  servo_2.attach(11);
+
+  lcd.setCursor (0, 0);
+  lcd.print("     ARDUINO    ");
+  lcd.setCursor (0, 1);
+  lcd.print(" PARKING SYSTEM ");
+  delay (2000);
+  lcd.clear();
+  
+}
+
+void loop() 
+{ 
+  RemoteXY_Handler ();
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(2);
+  // Sets the trigPin HIGH (ACTIVE) for 10 microseconds
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+  // Reads the echoPin, returns the sound wave travel time in microseconds
+  duration = pulseIn(echoPin, HIGH);
+  // Calculating the distance
+  distance = duration*0.034/2; // Speed of sound wave divided by 2 (go and back)
+  // Displays the distance on the Serial Monitor
+  Serial.print("Distance: ");
+  Serial.print(distance);
+  
+  if ((digitalRead (IR1) == HIGH)) {
+      
+      while(total <= 0 ){
+        servo_1.write(143);
+        
+        if (digitalRead (IR2) == HIGH) {
+          servo_2.write(0);
+          delay(50);
+          }else{
+          total += 1;
+          servo_2.write(100);
+          delay(2000);
+          }
+    
+      }
+    servo_1.write(143);
+    delay(50);
+    }else{
+    total -= 1;
+    servo_1.write(75);
+    delay(2000);
+    }
+    if (digitalRead (IR2) == HIGH) {
+      while(total>=6){
+        lcd.setCursor (0, 0);
+        lcd.print("    WELCOME!    ");
+        lcd.setCursor (0, 1);
+        lcd.print("Slot Left:     ");
+        lcd.print(total);
+        servo_2.write(0);
+        if (digitalRead (IR1) == HIGH) {
+        servo_1.write(143);
+        delay(50);
+        }else{
+        total -= 1;
+        servo_1.write(75);
+        delay(2000);
+        }
+      }
+    servo_2.write(0);
+    delay(50);
+    }else{
+    total += 1;
+    servo_2.write(100);
+    delay(2000);
+    }
+    if(total >0){
+      lcd.setCursor (0, 0);
+      lcd.print("    WELCOME!    ");
+      lcd.setCursor (0, 1);
+      lcd.print("Slot Left:     ");
+      lcd.print(total);
+    }
+    else{
+      lcd.setCursor (0, 0);
+      lcd.print("    Sorry    ");
+      lcd.setCursor (0, 1);
+      lcd.print("Parking is Full  ");
+    }
+    dtostrf(total, 0, 1, RemoteXY.totalx);
+    
+ 
+
+
+}
